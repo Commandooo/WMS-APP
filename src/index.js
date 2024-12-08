@@ -1,14 +1,24 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css'; // Globalne style
+import './index.css';
 import App from './App';
-import { AuthProvider } from './context/AuthContext'; // Import AuthProvider
+import { AuthProvider, useAuth } from './context/AuthContext';
+
+function AppWrapper() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <div>Ładowanie...</div>; // Możesz dodać spinner lub ekran ładowania
+  }
+
+  return <App />;
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <React.StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </React.StrictMode>
+  <AuthProvider>
+    <React.StrictMode>
+      <AppWrapper />
+    </React.StrictMode>
+  </AuthProvider>
 );
