@@ -19,7 +19,8 @@ function Sidebar() {
             <a href="/">Pulpit</a>
             <a href="/deliveries">Dostawy</a>
             <a href="/producers">Producenci</a>
-            {isAdmin && <a href="/admin">Panel Admina</a>} {/* Widoczny tylko dla admina */}
+            {/* Widoczny tylko dla admina */}
+            {isAdmin && <a href="/admin">Panel Admina</a>}
             {user && (
                 <button onClick={handleLogout} className="logout-btn">
                     Wyloguj

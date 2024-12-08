@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, getDocs, setDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 function AdminPanel() {
     const [email, setEmail] = useState('');
@@ -10,80 +10,88 @@ function AdminPanel() {
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
 
-    useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                const snapshot = await getDocs(collection(db, 'users'));
-                const users = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                }));
-                setUsers(users);
-                console.log('Lista użytkowników została odświeżona:', users);
-            } catch (error) {
-                console.error('Błąd podczas pobierania użytkowników:', error);
-            }
-        };
+    const fetchUsers = async () => {
+        try {
+            const snapshot = await getDocs(collection(db, 'users'));
+            const users = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
+            setUsers(users);
+            console.log('Lista użytkowników została odświeżona:', users);
+        } catch (error) {
+            console.error('Błąd podczas pobierania użytkowników:', error);
+        }
+    };
 
+    useEffect(() => {
         fetchUsers();
     }, []);
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
+        setSuccessMessage('');
+        setErrorMessage('');
 
         try {
-            console.log('Tworzenie nowego użytkownika:', email);
+            const functions = getFunctions();
+            const createUser = httpsCallable(functions, 'createUser');
 
-            // Zapamiętaj obecnie zalogowanego użytkownika
-            const originalUser = auth.currentUser;
+            const result = await createUser({
+                email: email,
+                password: password,
+                role: 'user',
+            });
 
-            // Tworzenie nowego użytkownika w Authentication
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const newUser = userCredential.user;
+            console.log(result.data.message);
 
-            console.log('Nowy użytkownik został utworzony:', newUser.email);
-
-            // Dodanie użytkownika do Firestore
-            const userDocRef = doc(db, 'users', newUser.email);
-            await setDoc(userDocRef, { email: newUser.email, role: 'user' });
-
-            console.log('Nowy użytkownik zapisany w Firestore:', newUser.email);
-
-            // Przywrócenie pierwotnego użytkownika bez zmiany trasy
-            if (originalUser) {
-                await auth.updateCurrentUser(originalUser);
-                console.log('Przywrócono pierwotnego użytkownika:', originalUser.email);
-            }
-
-            // Zresetowanie pól formularza
+            fetchUsers();
             setEmail('');
             setPassword('');
-            setSuccessMessage(`Użytkownik ${newUser.email} został utworzony!`);
-
-            // Odświeżenie listy użytkowników
-            const snapshot = await getDocs(collection(db, 'users'));
-            const updatedUsers = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
-            setUsers(updatedUsers);
+            setSuccessMessage(`Użytkownik ${email} został utworzony!`);
         } catch (error) {
-            console.error('Błąd podczas tworzenia użytkownika:', error);
+            console.error('Błąd podczas tworzenia użytkownika:', error.message);
             setErrorMessage('Nie udało się utworzyć użytkownika.');
         }
     };
 
     const handleDeleteUser = async (userId) => {
-        try {
-            await deleteDoc(doc(db, 'users', userId));
-            console.log(`Użytkownik ${userId} został usunięty z Firestore`);
+        setSuccessMessage('');
+        setErrorMessage('');
 
-            // Aktualizacja listy użytkowników
-            setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
+        try {
+            const functions = getFunctions();
+            const deleteUser = httpsCallable(functions, 'deleteUser');
+
+            const result = await deleteUser({ uid: userId });
+
+            console.log(result.data.message);
+
+            fetchUsers();
             setSuccessMessage(`Użytkownik ${userId} został usunięty.`);
         } catch (error) {
-            console.error('Błąd podczas usuwania użytkownika:', error);
+            console.error('Błąd podczas usuwania użytkownika:', error.message);
             setErrorMessage('Nie udało się usunąć użytkownika.');
+        }
+    };
+
+    const handleSetAdmin = async (email) => {
+        setSuccessMessage('');
+        setErrorMessage('');
+
+        try {
+            const functions = getFunctions();
+            const setAdmin = httpsCallable(functions, 'setAdmin');
+
+            const result = await setAdmin({ email });
+
+            console.log(result.data.message);
+
+            fetchUsers();
+            setSuccessMessage(`Użytkownik ${email} został ustawiony jako admin.`);
+        } catch (error) {
+            console.error('Błąd podczas ustawiania admina:', error.message);
+            setErrorMessage('Nie udało się ustawić użytkownika jako admin.');
         }
     };
 
@@ -123,6 +131,7 @@ function AdminPanel() {
                     users.map((user) => (
                         <li key={user.id}>
                             {user.email} - {user.role || 'brak roli'}
+                            <button onClick={() => handleSetAdmin(user.email)}>Ustaw jako admin</button>
                             <button onClick={() => handleDeleteUser(user.id)}>Usuń</button>
                         </li>
                     ))

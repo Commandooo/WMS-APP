@@ -21,3 +21,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+functions/my-app-wms-firebase-adminsdk-5niry-3047760271.json
+
+functions/node_modules
