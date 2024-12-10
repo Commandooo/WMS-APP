@@ -1,11 +1,11 @@
 import React from 'react';
+import PropTypes from 'prop-types'; // Import PropTypes
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function PrivateRoute({ children, adminOnly = false }) {
     const { user, isAdmin, loading } = useAuth();
 
-    // Sprawdzenie, czy trwa ładowanie
     if (loading) {
         return <div>Ładowanie...</div>; // Możesz tu dodać spinner lub inny element ładowania
     }
@@ -25,5 +25,11 @@ function PrivateRoute({ children, adminOnly = false }) {
     // Jeśli wszystkie warunki są spełnione, wyświetl dzieci
     return children;
 }
+
+// Definicje PropTypes
+PrivateRoute.propTypes = {
+    children: PropTypes.node.isRequired,
+    adminOnly: PropTypes.bool,
+};
 
 export default PrivateRoute;

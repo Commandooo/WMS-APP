@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import PropTypes from 'prop-types'; // Import PropTypes
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { auth } from '../firebase';
 
@@ -19,7 +20,6 @@ export function AuthProvider({ children }) {
                     const idTokenResult = await currentUser.getIdTokenResult();
                     const adminClaim = idTokenResult.claims.admin;
                     setIsAdmin(!!adminClaim); // Sprawdź, czy custom claim `admin` istnieje
-                    console.log("Admin status z tokenu:", !!adminClaim);
                 } catch (error) {
                     console.error("Błąd podczas sprawdzania custom claims:", error);
                     setIsAdmin(false);
@@ -38,13 +38,12 @@ export function AuthProvider({ children }) {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             setUser(userCredential.user);
 
-            // Wymuś odświeżenie tokenu po zalogowaniu, aby pobrać aktualne custom claims
+            // Odśwież token, aby pobrać aktualne custom claims
             const idTokenResult = await userCredential.user.getIdTokenResult(true);
             const adminClaim = idTokenResult.claims.admin;
             setIsAdmin(!!adminClaim);
 
             console.log('Zalogowano użytkownika:', userCredential.user.email);
-            console.log('Admin status:', !!adminClaim);
             return true;
         } catch (error) {
             console.error('Błąd logowania:', error);
@@ -68,6 +67,11 @@ export function AuthProvider({ children }) {
         </AuthContext.Provider>
     );
 }
+
+// Definicje PropTypes dla AuthProvider
+AuthProvider.propTypes = {
+    children: PropTypes.node.isRequired,
+};
 
 export function useAuth() {
     return useContext(AuthContext);

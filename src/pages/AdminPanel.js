@@ -1,14 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth, db } from '../firebase';
+import {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    updatePassword, // Importowanie funkcji do zmiany hasła
+} from 'firebase/auth';
+import {
+    collection,
+    getDocs,
+    doc,
+    setDoc,
+    deleteDoc,
+    updateDoc,
+} from 'firebase/firestore';
 
 function AdminPanel() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
     const [users, setUsers] = useState([]);
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+    const [currentAdminEmail, setCurrentAdminEmail] = useState('');
+    const [adminPassword, setAdminPassword] = useState('');
 
     const fetchUsers = async () => {
         try {
@@ -18,7 +32,6 @@ function AdminPanel() {
                 ...doc.data(),
             }));
             setUsers(users);
-            console.log('Lista użytkowników została odświeżona:', users);
         } catch (error) {
             console.error('Błąd podczas pobierania użytkowników:', error);
         }
@@ -26,6 +39,9 @@ function AdminPanel() {
 
     useEffect(() => {
         fetchUsers();
+        if (auth.currentUser) {
+            setCurrentAdminEmail(auth.currentUser.email);
+        }
     }, []);
 
     const handleCreateUser = async (e) => {
@@ -34,64 +50,100 @@ function AdminPanel() {
         setErrorMessage('');
 
         try {
-            const functions = getFunctions();
-            const createUser = httpsCallable(functions, 'createUser');
+            console.log('Rozpoczęto tworzenie użytkownika...');
+            const newUserCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const newUser = newUserCredential.user;
 
-            const result = await createUser({
-                email: email,
-                password: password,
+            console.log('Utworzono użytkownika w Authentication:', newUser);
+
+            // Przełączenie z powrotem na administratora
+            await signInWithEmailAndPassword(auth, currentAdminEmail, adminPassword);
+
+            console.log('Powrót do konta administratora.');
+
+            // Dodanie użytkownika do Firestore Database
+            await setDoc(doc(db, 'users', newUser.email), {
+                email: newUser.email,
                 role: 'user',
             });
 
-            console.log(result.data.message);
+            console.log('Użytkownik dodany do Firestore.');
 
+            setSuccessMessage(`Użytkownik ${email} został utworzony!`);
             fetchUsers();
             setEmail('');
             setPassword('');
-            setSuccessMessage(`Użytkownik ${email} został utworzony!`);
         } catch (error) {
             console.error('Błąd podczas tworzenia użytkownika:', error.message);
             setErrorMessage('Nie udało się utworzyć użytkownika.');
         }
     };
 
-    const handleDeleteUser = async (userId) => {
+    const handleDeleteUser = async (userEmail) => {
         setSuccessMessage('');
         setErrorMessage('');
 
         try {
-            const functions = getFunctions();
-            const deleteUser = httpsCallable(functions, 'deleteUser');
-
-            const result = await deleteUser({ uid: userId });
-
-            console.log(result.data.message);
-
+            await deleteDoc(doc(db, 'users', userEmail));
+            setSuccessMessage(`Użytkownik ${userEmail} został usunięty.`);
             fetchUsers();
-            setSuccessMessage(`Użytkownik ${userId} został usunięty.`);
         } catch (error) {
             console.error('Błąd podczas usuwania użytkownika:', error.message);
             setErrorMessage('Nie udało się usunąć użytkownika.');
         }
     };
 
-    const handleSetAdmin = async (email) => {
+    const handleSetAdmin = async (userEmail) => {
         setSuccessMessage('');
         setErrorMessage('');
 
         try {
-            const functions = getFunctions();
-            const setAdmin = httpsCallable(functions, 'setAdmin');
-
-            const result = await setAdmin({ email });
-
-            console.log(result.data.message);
-
+            await updateDoc(doc(db, 'users', userEmail), {
+                role: 'admin',
+            });
+            setSuccessMessage(`Użytkownik ${userEmail} został ustawiony jako admin.`);
             fetchUsers();
-            setSuccessMessage(`Użytkownik ${email} został ustawiony jako admin.`);
         } catch (error) {
             console.error('Błąd podczas ustawiania admina:', error.message);
             setErrorMessage('Nie udało się ustawić użytkownika jako admin.');
+        }
+    };
+
+    const handleRemoveAdmin = async (userEmail) => {
+        setSuccessMessage('');
+        setErrorMessage('');
+
+        try {
+            await updateDoc(doc(db, 'users', userEmail), {
+                role: 'user',
+            });
+            setSuccessMessage(`Użytkownik ${userEmail} został usunięty z roli admina.`);
+            fetchUsers();
+        } catch (error) {
+            console.error('Błąd podczas usuwania uprawnień admina:', error.message);
+            setErrorMessage('Nie udało się usunąć uprawnień admina.');
+        }
+    };
+
+    const handleChangePassword = async (userEmail) => {
+        setSuccessMessage('');
+        setErrorMessage('');
+
+        try {
+            // Znajdź użytkownika w Authentication
+            const user = auth.currentUser;
+
+            // Zmień hasło użytkownika
+            if (user) {
+                await updatePassword(user, newPassword);
+                setSuccessMessage(`Hasło użytkownika ${userEmail} zostało zmienione.`);
+                setNewPassword('');
+            } else {
+                throw new Error('Nie można znaleźć użytkownika w Authentication.');
+            }
+        } catch (error) {
+            console.error('Błąd podczas zmiany hasła:', error.message);
+            setErrorMessage('Nie udało się zmienić hasła użytkownika.');
         }
     };
 
@@ -118,6 +170,15 @@ function AdminPanel() {
                         required
                     />
                 </div>
+                <div>
+                    <label>Hasło administratora:</label>
+                    <input
+                        type="password"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        required
+                    />
+                </div>
                 <button type="submit">Utwórz użytkownika</button>
             </form>
             {successMessage && <p style={{ color: 'green' }}>{successMessage}</p>}
@@ -125,17 +186,22 @@ function AdminPanel() {
 
             <h2>Lista użytkowników</h2>
             <ul>
-                {users.length === 0 ? (
-                    <p>Brak użytkowników w systemie.</p>
-                ) : (
-                    users.map((user) => (
-                        <li key={user.id}>
-                            {user.email} - {user.role || 'brak roli'}
-                            <button onClick={() => handleSetAdmin(user.email)}>Ustaw jako admin</button>
-                            <button onClick={() => handleDeleteUser(user.id)}>Usuń</button>
-                        </li>
-                    ))
-                )}
+                {users.map((user) => (
+                    <li key={user.email}>
+                        {user.email} - {user.role}
+                        <button onClick={() => handleSetAdmin(user.email)}>Ustaw jako admin</button>
+                        <button onClick={() => handleRemoveAdmin(user.email)}>Usuń admina</button>
+                        <input
+                            type="password"
+                            placeholder="Nowe hasło"
+                            onChange={(e) => setNewPassword(e.target.value)}
+                        />
+                        <button onClick={() => handleChangePassword(user.email)}>
+                            Zmień hasło
+                        </button>
+                        <button onClick={() => handleDeleteUser(user.email)}>Usuń</button>
+                    </li>
+                ))}
             </ul>
         </div>
     );

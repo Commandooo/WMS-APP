@@ -1,26 +1,41 @@
-const admin = require("firebase-admin");
 const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const cors = require("cors");
 
 admin.initializeApp();
+const db = admin.firestore();
 
-exports.setAdmin = functions.https.onCall(async (data, context) => {
-    if (!context.auth || !context.auth.token.admin) {
-        throw new functions.https.HttpsError(
-            "permission-denied",
-            "Brak uprawnień do tej operacji"
-        );
-    }
+const corsHandler = cors({ origin: true });
 
-    const { email } = data;
-    try {
-        const user = await admin.auth().getUserByEmail(email);
-        await admin.auth().setCustomUserClaims(user.uid, { admin: true });
-        return { message: `Użytkownik ${email} został ustawiony jako admin.` };
-    } catch (error) {
-        throw new functions.https.HttpsError(
-            "internal",
-            "Błąd podczas ustawiania uprawnień admina",
-            error.message
-        );
-    }
+exports.createUser = functions.https.onCall(async (data, context) => {
+  try {
+    const user = await admin.auth().createUser({
+      email: data.email,
+      password: data.password,
+    });
+    return { message: `Utworzono użytkownika: ${user.uid}` };
+  } catch (error) {
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});
+
+const { email, password, role } = req.body;
+
+try {
+  const user = await admin.auth().createUser({
+    email,
+    password,
+  });
+
+  await db.collection("users").doc(user.uid).set({
+    email,
+    role,
+  });
+
+  return res.status(200).send({ message: "User created successfully!" });
+} catch (error) {
+  console.error("Error creating user:", error);
+  return res.status(500).send({ message: "Internal server error", error });
+}
+  });
 });

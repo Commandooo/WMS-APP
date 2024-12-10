@@ -17,6 +17,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const functions = getFunctions(app); // Dodaj ten import i eksport
+const functions = getFunctions(app, 'europe-west1');// Dodaj ten import i eksport
 
 export { db, auth, functions };
