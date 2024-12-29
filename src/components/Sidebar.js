@@ -1,33 +1,40 @@
-import React from 'react';
-import { useAuth } from '../context/AuthContext'; // Pobieranie funkcji useAuth z kontekstu
-import './Sidebar.css'; // Import stylów dla sidebaru
+import React from "react";
+import PropTypes from "prop-types";
+import "./Sidebar.css";
 
-function Sidebar() {
-    const { user, logout, isAdmin } = useAuth(); // Pobieranie user, logout i isAdmin z kontekstu
-
-    const handleLogout = async () => {
-        try {
-            await logout();
-            alert('Wylogowano pomyślnie!');
-        } catch (error) {
-            console.error('Logout error:', error);
-        }
-    };
-
+function Sidebar({ isOpen, toggleSidebar }) {
     return (
-        <nav className="sidebar">
-            <a href="/">Pulpit</a>
-            <a href="/deliveries">Dostawy</a>
-            <a href="/producers">Producenci</a>
-            {/* Widoczny tylko dla admina */}
-            {isAdmin && <a href="/admin">Panel Admina</a>}
-            {user && (
-                <button onClick={handleLogout} className="logout-btn">
-                    Wyloguj
+        <div className={`sidebar ${isOpen ? "open" : ""}`}>
+            <div className="sidebar-header">
+                <h2>Menu</h2>
+                <button onClick={toggleSidebar} className="close-btn">
+                    &times;
                 </button>
-            )}
-        </nav>
+            </div>
+            <ul>
+                <li>
+                    <a href="/dashboard">Pulpit</a>
+                </li>
+                <li>
+                    <a href="/deliveries">Dostawy</a>
+                </li>
+                <li>
+                    <a href="/producers">Producenci</a>
+                </li>
+                <li>
+                    <a href="/admin">Panel Admina</a>
+                </li>
+            </ul>
+            <button className="logout-btn" onClick={() => alert("Wylogowano!")}>
+                Wyloguj
+            </button>
+        </div>
     );
 }
+
+Sidebar.propTypes = {
+    isOpen: PropTypes.bool.isRequired,
+    toggleSidebar: PropTypes.func.isRequired,
+};
 
 export default Sidebar;
